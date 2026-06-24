@@ -1274,7 +1274,6 @@ public class ImmuClient {
 
     /**
      * Commits a change of a value for a single key.
-     * 
      * Equivalent to {@link #set(String, byte[]) set} but with additional
      * server-provided proof validation.
      * 
@@ -1288,24 +1287,45 @@ public class ImmuClient {
 
     /**
      * Commits a change of a value for a single key.
-     * 
      * Equivalent to {@link #set(byte[], byte[]) set} but with additional
      * server-provided proof validation.
-     * 
+     *
      * @param key   the key to set
      * @param value the value to set
      * @return the transaction header
      */
-    public synchronized TxHeader verifiedSet(byte[] key, byte[] value) throws VerificationException {
+    public TxHeader verifiedSet(byte[] key, byte[] value) throws VerificationException {
+        QueryOptions options = QueryOptions.newBuilder()
+                .withKey(key)
+                .withValue(value)
+                .build();
+        return verifiedSet(options);
+    }
+
+    /**
+     * Commits a change of a value for a single key.
+     * server-provided proof validation.
+     *
+     * @param options single parameter for holding different query options
+     * @return the transaction header
+     */
+    public synchronized TxHeader verifiedSet(QueryOptions options)
+            throws VerificationException {
         final ImmuState state = state();
 
         final ImmudbProto.KeyValue kv = ImmudbProto.KeyValue.newBuilder()
-                .setKey(Utils.toByteString(key))
-                .setValue(Utils.toByteString(value))
+                .setKey(Utils.toByteString(options.getKey()))
+                .setValue(Utils.toByteString(options.getValue()))
                 .build();
 
+        ImmudbProto.SetRequest.Builder sendReqBuilder = ImmudbProto.SetRequest
+                .newBuilder()
+                .addKVs(kv);
+        if (options.havePreconditions()) {
+            sendReqBuilder.addAllPreconditions(options.getPreconditions());
+        }
         final ImmudbProto.VerifiableSetRequest vSetReq = ImmudbProto.VerifiableSetRequest.newBuilder()
-                .setSetRequest(ImmudbProto.SetRequest.newBuilder().addKVs(kv).build())
+                .setSetRequest(sendReqBuilder.build())
                 .setProveSinceTx(state.getTxId())
                 .build();
 
@@ -1329,8 +1349,8 @@ public class ImmuClient {
         final TxHeader txHeader = tx.getHeader();
 
         final Entry entry = Entry.valueOf(ImmudbProto.Entry.newBuilder()
-                .setKey(Utils.toByteString(key))
-                .setValue(Utils.toByteString(value))
+                .setKey(Utils.toByteString(options.getKey()))
+                .setValue(Utils.toByteString(options.getValue()))
                 .build());
 
         final InclusionProof inclusionProof = tx.proof(entry.getEncodedKey());
