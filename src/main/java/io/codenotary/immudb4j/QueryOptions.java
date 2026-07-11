@@ -1,14 +1,12 @@
 package io.codenotary.immudb4j;
 
-import io.codenotary.immudb.ImmudbProto;
-
 import java.util.Collections;
 import java.util.List;
 
 public class QueryOptions {
     private final byte[] key;
     private final byte[] value;
-    private final List<ImmudbProto.Precondition> preconditions;
+    private final List<Precondition> preconditions;
 
     private QueryOptions(Builder builder) {
         this.key = builder.key;
@@ -24,7 +22,7 @@ public class QueryOptions {
         return value;
     }
 
-    public List<ImmudbProto.Precondition> getPreconditions() {
+    public List<Precondition> getPreconditions() {
         return preconditions;
     }
 
@@ -39,7 +37,7 @@ public class QueryOptions {
     public static class Builder {
         private byte[] key;
         private byte[] value;
-        private List<ImmudbProto.Precondition> preconditions;
+        private List<Precondition> preconditions;
 
         private Builder() {
             key = null;
@@ -57,7 +55,7 @@ public class QueryOptions {
             return this;
         }
 
-        public Builder withPreconditions(List<ImmudbProto.Precondition> preconditions) {
+        public Builder withPreconditions(List<Precondition> preconditions) {
             this.preconditions = preconditions;
             return this;
         }

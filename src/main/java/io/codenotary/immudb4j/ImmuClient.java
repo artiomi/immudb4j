@@ -1322,7 +1322,10 @@ public class ImmuClient {
                 .newBuilder()
                 .addKVs(kv);
         if (options.havePreconditions()) {
-            sendReqBuilder.addAllPreconditions(options.getPreconditions());
+            List<ImmudbProto.Precondition> preconditions = options.getPreconditions().stream()
+                    .map(Precondition::toProto)
+                    .collect(Collectors.toList());
+            sendReqBuilder.addAllPreconditions(preconditions);
         }
         final ImmudbProto.VerifiableSetRequest vSetReq = ImmudbProto.VerifiableSetRequest.newBuilder()
                 .setSetRequest(sendReqBuilder.build())
