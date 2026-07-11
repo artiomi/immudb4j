@@ -3,12 +3,12 @@ package io.codenotary.immudb4j;
 import java.util.Collections;
 import java.util.List;
 
-public class QueryOptions {
+public class VerifySetOptions {
     private final byte[] key;
     private final byte[] value;
     private final List<Precondition> preconditions;
 
-    private QueryOptions(Builder builder) {
+    private VerifySetOptions(Builder builder) {
         this.key = builder.key;
         this.value = builder.value;
         this.preconditions = Collections.unmodifiableList(builder.preconditions);
@@ -60,8 +60,8 @@ public class QueryOptions {
             return this;
         }
 
-        public QueryOptions build() {
-            return new QueryOptions(this);
+        public VerifySetOptions build() {
+            return new VerifySetOptions(this);
         }
     }
 

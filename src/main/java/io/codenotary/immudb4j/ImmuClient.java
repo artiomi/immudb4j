@@ -1295,7 +1295,7 @@ public class ImmuClient {
      * @return the transaction header
      */
     public TxHeader verifiedSet(byte[] key, byte[] value) throws VerificationException {
-        QueryOptions options = QueryOptions.newBuilder()
+        VerifySetOptions options = VerifySetOptions.newBuilder()
                 .withKey(key)
                 .withValue(value)
                 .build();
@@ -1309,7 +1309,7 @@ public class ImmuClient {
      * @param options single parameter for holding different query options
      * @return the transaction header
      */
-    public synchronized TxHeader verifiedSet(QueryOptions options)
+    public synchronized TxHeader verifiedSet(VerifySetOptions options)
             throws VerificationException {
         final ImmuState state = state();
 

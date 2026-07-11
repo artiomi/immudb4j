@@ -22,7 +22,6 @@ import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.Collections;
 
 public class VerifiedSetAndGetTest extends ImmuClientIntegrationTest {
@@ -134,7 +133,7 @@ public class VerifiedSetAndGetTest extends ImmuClientIntegrationTest {
         } catch (VerificationException e) {
             Assert.fail("Failed at verifiedSet. Cause: " + e.getMessage(), e);
         }
-            QueryOptions options = QueryOptions.newBuilder()
+            VerifySetOptions options = VerifySetOptions.newBuilder()
                     .withKey(key)
                     .withValue(val)
                     .withPreconditions(Collections.singletonList(Precondition.KeyMustNotExistPrecondition.of(key)))
@@ -152,7 +151,7 @@ public class VerifiedSetAndGetTest extends ImmuClientIntegrationTest {
         byte[] key = "prec2".getBytes(StandardCharsets.UTF_8);
         byte[] val = "test-vset-vget".getBytes(StandardCharsets.UTF_8);
 
-        QueryOptions options = QueryOptions.newBuilder()
+        VerifySetOptions options = VerifySetOptions.newBuilder()
                 .withKey(key)
                 .withValue(val)
                 .withPreconditions(Collections.singletonList(Precondition.KeyMustExistPrecondition.of(key)))
@@ -181,7 +180,7 @@ public class VerifiedSetAndGetTest extends ImmuClientIntegrationTest {
         } catch (VerificationException e) {
             Assert.fail("Failed at verifiedSet. Cause: " + e.getMessage(), e);
         }
-        QueryOptions options = QueryOptions.newBuilder()
+        VerifySetOptions options = VerifySetOptions.newBuilder()
                 .withKey(key)
                 .withValue(val)
                 .withPreconditions(Collections.singletonList(Precondition.KeyNotModifiedAfterTXPrecondition.of(key, txId)))
