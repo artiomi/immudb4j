@@ -46,10 +46,6 @@ public class SetOptions {
         return preconditions;
     }
 
-    public boolean hasPreconditions() {
-        return preconditions != null && !preconditions.isEmpty();
-    }
-
     public static class Builder {
         private byte[] key;
         private byte[] value;

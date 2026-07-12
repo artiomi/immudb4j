@@ -35,7 +35,12 @@ import io.codenotary.immudb4j.sql.SQLQueryResult;
 import io.codenotary.immudb4j.sql.SQLValue;
 import io.codenotary.immudb4j.user.Permission;
 import io.codenotary.immudb4j.user.User;
-import io.grpc.*;
+
+import io.grpc.ConnectivityState;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 
 import java.nio.ByteBuffer;
