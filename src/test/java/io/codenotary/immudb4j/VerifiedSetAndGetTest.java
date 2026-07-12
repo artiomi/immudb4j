@@ -15,8 +15,8 @@ limitations under the License.
 */
 package io.codenotary.immudb4j;
 
+import io.codenotary.immudb4j.exceptions.FailedPreconditionException;
 import io.codenotary.immudb4j.exceptions.VerificationException;
-import io.grpc.StatusRuntimeException;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -133,14 +133,14 @@ public class VerifiedSetAndGetTest extends ImmuClientIntegrationTest {
         } catch (VerificationException e) {
             Assert.fail("Failed at verifiedSet. Cause: " + e.getMessage(), e);
         }
-            VerifySetOptions options = VerifySetOptions.newBuilder()
-                    .withKey(key)
-                    .withValue(val)
-                    .withPreconditions(Collections.singletonList(Precondition.KeyMustNotExistPrecondition.of(key)))
-                    .build();
+        SetOptions options = SetOptions.newBuilder()
+                .withKey(key)
+                .withValue(val)
+                .withPreconditions(Collections.singletonList(Precondition.KeyMustNotExistPrecondition.of(key)))
+                .build();
         // on second save exception should be thrown
-        StatusRuntimeException exception = Assert.expectThrows(StatusRuntimeException.class, () -> immuClient.verifiedSet(options));
-        Assert.assertEquals(exception.getMessage(), "FAILED_PRECONDITION: precondition failed: KeyMustNotExist");
+        FailedPreconditionException exception = Assert.expectThrows(FailedPreconditionException.class, () -> immuClient.verifiedSet(options));
+        Assert.assertTrue(exception.getMessage().contains("KeyMustNotExist"), "Error message don't contain precondition name");
         immuClient.closeSession();
     }
 
@@ -151,14 +151,14 @@ public class VerifiedSetAndGetTest extends ImmuClientIntegrationTest {
         byte[] key = "prec2".getBytes(StandardCharsets.UTF_8);
         byte[] val = "test-vset-vget".getBytes(StandardCharsets.UTF_8);
 
-        VerifySetOptions options = VerifySetOptions.newBuilder()
+        SetOptions options = SetOptions.newBuilder()
                 .withKey(key)
                 .withValue(val)
                 .withPreconditions(Collections.singletonList(Precondition.KeyMustExistPrecondition.of(key)))
                 .build();
 
-        StatusRuntimeException exception = Assert.expectThrows(StatusRuntimeException.class, () -> immuClient.verifiedSet(options));
-        Assert.assertEquals(exception.getMessage(), "FAILED_PRECONDITION: precondition failed: KeyMustExist");
+        FailedPreconditionException exception = Assert.expectThrows(FailedPreconditionException.class, () -> immuClient.verifiedSet(options));
+        Assert.assertTrue(exception.getMessage().contains("KeyMustExist"), "Error message don't contain precondition name");
         immuClient.closeSession();
     }
 
@@ -168,27 +168,27 @@ public class VerifiedSetAndGetTest extends ImmuClientIntegrationTest {
 
         byte[] key = "prec3".getBytes(StandardCharsets.UTF_8);
         byte[] val = "test-vset-vget".getBytes(StandardCharsets.UTF_8);
-        long txId = 0L;
+        long tx1Id = 0L;
 
         try {
             //first save
-            TxHeader txHdr = immuClient.verifiedSet(key, val);
-            txId = txHdr.getId();
-            Assert.assertNotNull(txHdr, "The result of first verifiedSet must not be null.");
-            immuClient.verifiedSet(key, val);
-            Assert.assertNotNull(txHdr, "The result of second verifiedSet must not be null.");
+            TxHeader tx1Hdr = immuClient.verifiedSet(key, val);
+            tx1Id = tx1Hdr.getId();
+            Assert.assertNotNull(tx1Hdr, "The result of first verifiedSet must not be null.");
+            TxHeader tx2Hdr = immuClient.verifiedSet(key, val);
+            Assert.assertNotNull(tx2Hdr, "The result of second verifiedSet must not be null.");
         } catch (VerificationException e) {
             Assert.fail("Failed at verifiedSet. Cause: " + e.getMessage(), e);
         }
-        VerifySetOptions options = VerifySetOptions.newBuilder()
+        SetOptions options = SetOptions.newBuilder()
                 .withKey(key)
                 .withValue(val)
-                .withPreconditions(Collections.singletonList(Precondition.KeyNotModifiedAfterTXPrecondition.of(key, txId)))
+                .withPreconditions(Collections.singletonList(Precondition.KeyNotModifiedAfterTXPrecondition.of(key, tx1Id)))
                 .build();
 
         // on second save exception should be thrown
-        StatusRuntimeException exception = Assert.expectThrows(StatusRuntimeException.class, () -> immuClient.verifiedSet(options));
-        Assert.assertEquals(exception.getMessage(), "FAILED_PRECONDITION: precondition failed: KeyNotModifiedAfterTxID");
+        FailedPreconditionException exception = Assert.expectThrows(FailedPreconditionException.class, () -> immuClient.verifiedSet(options));
+        Assert.assertTrue(exception.getMessage().contains("KeyNotModifiedAfterTxID"), "Error message don't contain precondition name");
         immuClient.closeSession();
     }
 
