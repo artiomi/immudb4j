@@ -35,11 +35,13 @@ import io.codenotary.immudb4j.sql.SQLQueryResult;
 import io.codenotary.immudb4j.sql.SQLValue;
 import io.codenotary.immudb4j.user.Permission;
 import io.codenotary.immudb4j.user.User;
+
+import io.grpc.ConnectivityState;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
-import io.grpc.ConnectivityState;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -55,6 +57,7 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -1182,14 +1185,33 @@ public class ImmuClient {
      * @return the transaction header
      */
     public synchronized TxHeader set(byte[] key, byte[] value) {
+        SetOptions options = SetOptions.newBuilder()
+                .withKey(key)
+                .withValue(value)
+                .build();
+        return set(options);
+    }
+
+    /**
+     * Commits a change of a value for a single key.
+     *
+     * @param options single parameter for holding different set options
+     * @return the transaction header
+     */
+    public synchronized TxHeader set(SetOptions options) {
         final ImmudbProto.KeyValue kv = ImmudbProto.KeyValue.newBuilder()
-                .setKey(Utils.toByteString(key))
-                .setValue(Utils.toByteString(value))
+                .setKey(Utils.toByteString(options.getKey()))
+                .setValue(Utils.toByteString(options.getValue()))
                 .build();
 
-        final ImmudbProto.SetRequest req = ImmudbProto.SetRequest.newBuilder().addKVs(kv).build();
+        List<ImmudbProto.Precondition> preconditions = mapPreconditions(options.getPreconditions());
 
-        return TxHeader.valueOf(blockingStub.set(req));
+        final ImmudbProto.SetRequest req = ImmudbProto.SetRequest.newBuilder()
+                .addKVs(kv)
+                .addAllPreconditions(preconditions)
+                .build();
+        ImmudbProto.TxHeader txHeader = callExecutorWrapper(() -> blockingStub.set(req));
+        return TxHeader.valueOf(txHeader);
     }
 
     /**
@@ -1274,7 +1296,6 @@ public class ImmuClient {
 
     /**
      * Commits a change of a value for a single key.
-     * 
      * Equivalent to {@link #set(String, byte[]) set} but with additional
      * server-provided proof validation.
      * 
@@ -1288,29 +1309,50 @@ public class ImmuClient {
 
     /**
      * Commits a change of a value for a single key.
-     * 
      * Equivalent to {@link #set(byte[], byte[]) set} but with additional
      * server-provided proof validation.
-     * 
+     *
      * @param key   the key to set
      * @param value the value to set
      * @return the transaction header
      */
-    public synchronized TxHeader verifiedSet(byte[] key, byte[] value) throws VerificationException {
+    public TxHeader verifiedSet(byte[] key, byte[] value) throws VerificationException {
+        SetOptions options = SetOptions.newBuilder()
+                .withKey(key)
+                .withValue(value)
+                .build();
+        return verifiedSet(options);
+    }
+
+    /**
+     * Commits a change of a value for a single key.
+     * Equivalent to {@link #set(SetOptions) set} but with additional
+     * server-provided proof validation.
+     *
+     * @param options single parameter for holding different set options
+     * @return the transaction header
+     */
+    public synchronized TxHeader verifiedSet(SetOptions options)
+            throws VerificationException {
         final ImmuState state = state();
 
         final ImmudbProto.KeyValue kv = ImmudbProto.KeyValue.newBuilder()
-                .setKey(Utils.toByteString(key))
-                .setValue(Utils.toByteString(value))
+                .setKey(Utils.toByteString(options.getKey()))
+                .setValue(Utils.toByteString(options.getValue()))
                 .build();
 
+        List<ImmudbProto.Precondition> preconditions = mapPreconditions(options.getPreconditions());
+        ImmudbProto.SetRequest.Builder sendReqBuilder = ImmudbProto.SetRequest
+                .newBuilder()
+                .addKVs(kv)
+                .addAllPreconditions(preconditions);
+
         final ImmudbProto.VerifiableSetRequest vSetReq = ImmudbProto.VerifiableSetRequest.newBuilder()
-                .setSetRequest(ImmudbProto.SetRequest.newBuilder().addKVs(kv).build())
+                .setSetRequest(sendReqBuilder.build())
                 .setProveSinceTx(state.getTxId())
                 .build();
 
-        final ImmudbProto.VerifiableTx vtx = blockingStub.verifiableSet(vSetReq);
-
+        final ImmudbProto.VerifiableTx vtx = callExecutorWrapper(() -> blockingStub.verifiableSet(vSetReq));
         final int ne = vtx.getTx().getHeader().getNentries();
 
         if (ne != 1 || vtx.getTx().getEntriesList().size() != 1) {
@@ -1329,8 +1371,8 @@ public class ImmuClient {
         final TxHeader txHeader = tx.getHeader();
 
         final Entry entry = Entry.valueOf(ImmudbProto.Entry.newBuilder()
-                .setKey(Utils.toByteString(key))
-                .setValue(Utils.toByteString(value))
+                .setKey(Utils.toByteString(options.getKey()))
+                .setValue(Utils.toByteString(options.getValue()))
                 .build());
 
         final InclusionProof inclusionProof = tx.proof(entry.getEncodedKey());
@@ -2573,6 +2615,23 @@ public class ImmuClient {
             }
         });
         return result;
+    }
+
+    private List<ImmudbProto.Precondition> mapPreconditions(List<Precondition> preconditions) {
+        return preconditions.stream()
+                .map(Precondition::toProto)
+                .collect(Collectors.toList());
+    }
+
+    private <OUT> OUT callExecutorWrapper(Supplier<OUT> supplier) {
+        try {
+            return supplier.get();
+        } catch (StatusRuntimeException cause) {
+            if (Status.Code.FAILED_PRECONDITION == cause.getStatus().getCode()) {
+                throw new FailedPreconditionException(cause.getMessage(), cause);
+            }
+            throw cause;
+        }
     }
 
     //

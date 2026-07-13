@@ -15,10 +15,12 @@ limitations under the License.
 */
 package io.codenotary.immudb4j;
 
+import io.codenotary.immudb4j.exceptions.FailedPreconditionException;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 
 public class ReferenceTest extends ImmuClientIntegrationTest {
 
@@ -40,6 +42,73 @@ public class ReferenceTest extends ImmuClientIntegrationTest {
         TxHeader ref2TxHdr = immuClient.setReference(ref2Key, key, setTxHdr.getId());
         Assert.assertNotNull(ref2TxHdr);
 
+        immuClient.closeSession();
+    }
+
+    @Test(testName = "set with KeyMustNotExistPrecondition")
+    public void t2() {
+        immuClient.openSession("defaultdb", "immudb", "immudb");
+
+        byte[] key = "prec1".getBytes(StandardCharsets.UTF_8);
+        byte[] val = "test-set".getBytes(StandardCharsets.UTF_8);
+
+        // save element with key
+
+        TxHeader txHdr = immuClient.set(key, val);
+        Assert.assertNotNull(txHdr, "The result of 'set' must not be null.");
+
+        SetOptions options = SetOptions.newBuilder()
+                .withKey(key)
+                .withValue(val)
+                .withPreconditions(Collections.singletonList(Precondition.KeyMustNotExistPrecondition.of(key)))
+                .build();
+        // on second save exception should be thrown
+        FailedPreconditionException exception = Assert.expectThrows(FailedPreconditionException.class, () -> immuClient.set(options));
+        Assert.assertTrue(exception.getMessage().contains("KeyMustNotExist"), "Error message don't contain precondition name");
+        immuClient.closeSession();
+    }
+
+    @Test(testName = "set with KeyMustExistPrecondition")
+    public void t3() {
+        immuClient.openSession("defaultdb", "immudb", "immudb");
+
+        byte[] key = "prec2".getBytes(StandardCharsets.UTF_8);
+        byte[] val = "test-set".getBytes(StandardCharsets.UTF_8);
+
+        SetOptions options = SetOptions.newBuilder()
+                .withKey(key)
+                .withValue(val)
+                .withPreconditions(Collections.singletonList(Precondition.KeyMustExistPrecondition.of(key)))
+                .build();
+
+        FailedPreconditionException exception = Assert.expectThrows(FailedPreconditionException.class, () -> immuClient.set(options));
+        Assert.assertTrue(exception.getMessage().contains("KeyMustExist"), "Error message don't contain precondition name");
+        immuClient.closeSession();
+    }
+
+    @Test(testName = "set with KeyNotModifiedAfterTXPrecondition")
+    public void t4() {
+        immuClient.openSession("defaultdb", "immudb", "immudb");
+
+        byte[] key = "prec3".getBytes(StandardCharsets.UTF_8);
+        byte[] val = "test-set".getBytes(StandardCharsets.UTF_8);
+
+        //first save
+        TxHeader tx1Hdr = immuClient.set(key, val);
+        long tx1Id = tx1Hdr.getId();
+        Assert.assertNotNull(tx1Hdr, "The result of first 'set' must not be null.");
+        TxHeader tx2Hdr = immuClient.set(key, val);
+        Assert.assertNotNull(tx2Hdr, "The result of second 'set' must not be null.");
+
+        SetOptions options = SetOptions.newBuilder()
+                .withKey(key)
+                .withValue(val)
+                .withPreconditions(Collections.singletonList(Precondition.KeyNotModifiedAfterTXPrecondition.of(key, tx1Id)))
+                .build();
+
+        // on second save exception should be thrown
+        FailedPreconditionException exception = Assert.expectThrows(FailedPreconditionException.class, () -> immuClient.set(options));
+        Assert.assertTrue(exception.getMessage().contains("KeyNotModifiedAfterTxID"), "Error message don't contain precondition name");
         immuClient.closeSession();
     }
 
